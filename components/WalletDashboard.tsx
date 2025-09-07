@@ -9,7 +9,6 @@ export default function WalletDashboard() {
   const [searchEmail, setSearchEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
-  const [idempotencyKey, setIdempotencyKey] = useState('');
   const [result, setResult] = useState<any>(null);
 
   const utils = trpc.useUtils();
@@ -22,7 +21,7 @@ export default function WalletDashboard() {
     },
     onError: (error) => {
       setResult({ error: error.message });
-    }
+    },
   });
 
   const topUp = trpc.topUp.useMutation({
@@ -33,7 +32,7 @@ export default function WalletDashboard() {
     },
     onError: (error) => {
       setResult({ error: error.message });
-    }
+    },
   });
 
   const charge = trpc.charge.useMutation({
@@ -44,14 +43,18 @@ export default function WalletDashboard() {
     },
     onError: (error) => {
       setResult({ error: error.message });
-    }
+    },
   });
 
   const [shouldSearchUser, setShouldSearchUser] = useState(false);
 
-  const { data: searchedUser, error: searchError, isFetching: isSearching } = trpc.getUserByEmail.useQuery(
+  const {
+    data: searchedUser,
+    error: searchError,
+    isFetching: isSearching,
+  } = trpc.getUserByEmail.useQuery(
     { email: searchEmail },
-    { 
+    {
       enabled: shouldSearchUser && !!searchEmail,
       onSuccess: (data) => {
         setResult(data);
@@ -62,7 +65,7 @@ export default function WalletDashboard() {
       onError: (error) => {
         setResult({ error: error.message });
         setShouldSearchUser(false);
-      }
+      },
     }
   );
 
@@ -86,10 +89,12 @@ export default function WalletDashboard() {
   const handleTopUp = (e: React.FormEvent) => {
     e.preventDefault();
     if (userId && amount) {
+      const generatedIdempotencyKey =
+        Math.random().toString(36).substring(2) + Date.now().toString(36);
       topUp.mutate({
         userId,
         amount: parseFloat(amount),
-        idempotencyKey: idempotencyKey || undefined,
+        idempotencyKey: generatedIdempotencyKey,
       });
     }
   };
@@ -97,10 +102,12 @@ export default function WalletDashboard() {
   const handleCharge = (e: React.FormEvent) => {
     e.preventDefault();
     if (userId && amount) {
+      const generatedIdempotencyKey =
+        Math.random().toString(36).substring(2) + Date.now().toString(36);
       charge.mutate({
         userId,
         amount: parseFloat(amount),
-        idempotencyKey: idempotencyKey || undefined,
+        idempotencyKey: generatedIdempotencyKey,
       });
     }
   };
@@ -112,10 +119,6 @@ export default function WalletDashboard() {
     }
   };
 
-  const generateIdempotencyKey = () => {
-    setIdempotencyKey(Math.random().toString(36).substring(2, 15));
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="container mx-auto px-6 py-8">
@@ -124,20 +127,26 @@ export default function WalletDashboard() {
           <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             Wallet System API
           </h1>
-          <p className="text-slate-400 text-lg">Test Interface for User Account Management</p>
+          <p className="text-slate-400 text-lg">
+            Test Interface for User Account Management
+          </p>
         </div>
-        
+
         <div className="grid lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
           <div className="space-y-6">
             {/* Create Account */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">1</span>
+                <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">
+                  1
+                </span>
                 Create Account
               </h2>
               <form onSubmit={handleCreateAccount} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Email
+                  </label>
                   <input
                     type="email"
                     value={email}
@@ -148,7 +157,9 @@ export default function WalletDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Name</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Name
+                  </label>
                   <input
                     type="text"
                     value={name}
@@ -168,7 +179,9 @@ export default function WalletDashboard() {
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Creating...
                     </div>
-                  ) : 'Create Account'}
+                  ) : (
+                    'Create Account'
+                  )}
                 </button>
               </form>
             </div>
@@ -176,12 +189,16 @@ export default function WalletDashboard() {
             {/* Get User ID by Email */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">🔍</span>
+                <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">
+                  2
+                </span>
                 Find User by Email
               </h2>
               <form onSubmit={handleGetUserByEmail} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Email Address
+                  </label>
                   <input
                     type="email"
                     value={searchEmail}
@@ -201,7 +218,9 @@ export default function WalletDashboard() {
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Searching...
                     </div>
-                  ) : 'Find User'}
+                  ) : (
+                    'Find User'
+                  )}
                 </button>
               </form>
             </div>
@@ -209,12 +228,16 @@ export default function WalletDashboard() {
             {/* Top-Up */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">
+                  3
+                </span>
                 Top-Up (Add Balance)
               </h2>
               <form onSubmit={handleTopUp} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">User ID</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    User ID
+                  </label>
                   <input
                     type="text"
                     value={userId}
@@ -225,7 +248,9 @@ export default function WalletDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Amount ($)</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Amount ($)
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -236,25 +261,6 @@ export default function WalletDashboard() {
                     className="w-full bg-slate-900/50 border border-slate-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                     placeholder="0.00"
                     required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Idempotency Key
-                    <button
-                      type="button"
-                      onClick={generateIdempotencyKey}
-                      className="ml-2 text-xs bg-slate-600 hover:bg-slate-500 text-white px-3 py-1 rounded-md transition-colors"
-                    >
-                      Generate
-                    </button>
-                  </label>
-                  <input
-                    type="text"
-                    value={idempotencyKey}
-                    onChange={(e) => setIdempotencyKey(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-slate-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                    placeholder="For duplicate prevention"
                   />
                 </div>
                 <button
@@ -267,7 +273,9 @@ export default function WalletDashboard() {
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Processing...
                     </div>
-                  ) : 'Top Up'}
+                  ) : (
+                    'Top Up'
+                  )}
                 </button>
               </form>
             </div>
@@ -275,12 +283,16 @@ export default function WalletDashboard() {
             {/* Charge */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
+                <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">
+                  4
+                </span>
                 Charge (Deduct Balance)
               </h2>
               <form onSubmit={handleCharge} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">User ID</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    User ID
+                  </label>
                   <input
                     type="text"
                     value={userId}
@@ -291,7 +303,9 @@ export default function WalletDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Amount ($)</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Amount ($)
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -304,25 +318,6 @@ export default function WalletDashboard() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Idempotency Key
-                    <button
-                      type="button"
-                      onClick={generateIdempotencyKey}
-                      className="ml-2 text-xs bg-slate-600 hover:bg-slate-500 text-white px-3 py-1 rounded-md transition-colors"
-                    >
-                      Generate
-                    </button>
-                  </label>
-                  <input
-                    type="text"
-                    value={idempotencyKey}
-                    onChange={(e) => setIdempotencyKey(e.target.value)}
-                    className="w-full bg-slate-900/50 border border-slate-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                    placeholder="For duplicate prevention"
-                  />
-                </div>
                 <button
                   type="submit"
                   disabled={charge.isPending}
@@ -333,7 +328,9 @@ export default function WalletDashboard() {
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                       Processing...
                     </div>
-                  ) : 'Charge'}
+                  ) : (
+                    'Charge'
+                  )}
                 </button>
               </form>
             </div>
@@ -350,7 +347,9 @@ export default function WalletDashboard() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400 text-sm">ID:</span>
-                    <code className="text-slate-300 bg-slate-900/50 px-2 py-1 rounded text-xs">{user.id}</code>
+                    <code className="text-slate-300 bg-slate-900/50 px-2 py-1 rounded text-xs">
+                      {user.id}
+                    </code>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400 text-sm">Email:</span>
@@ -363,7 +362,9 @@ export default function WalletDashboard() {
                   <div className="border-t border-slate-600 pt-3 mt-3">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400 text-sm">Balance:</span>
-                      <span className="text-2xl font-bold text-green-400">${user.balance.toFixed(2)}</span>
+                      <span className="text-2xl font-bold text-green-400">
+                        ${user.balance.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -391,24 +392,56 @@ export default function WalletDashboard() {
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                   <div className="w-3 h-3 bg-purple-400 rounded-full mr-2"></div>
                   Transaction History
-                  <span className="ml-auto text-sm text-slate-400">({transactions.length})</span>
+                  <span className="ml-auto text-sm text-slate-400">
+                    ({transactions.length})
+                  </span>
                 </h3>
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                   {transactions.map((tx) => (
-                    <div key={tx.id} className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
+                    <div
+                      key={tx.id}
+                      className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all"
+                    >
                       <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center">
-                          <div className={tx.type === 'topup' ? 'w-2 h-2 rounded-full mr-2 bg-green-400' : 'w-2 h-2 rounded-full mr-2 bg-red-400'}></div>
-                          <span className="font-medium capitalize text-white">{tx.type}</span>
+                          <div
+                            className={
+                              tx.type === 'topup'
+                                ? 'w-2 h-2 rounded-full mr-2 bg-green-400'
+                                : 'w-2 h-2 rounded-full mr-2 bg-red-400'
+                            }
+                          ></div>
+                          <span className="font-medium capitalize text-white">
+                            {tx.type}
+                          </span>
                         </div>
-                        <span className={tx.type === 'topup' ? 'font-bold text-lg text-green-400' : 'font-bold text-lg text-red-400'}>
-                          {tx.type === 'topup' ? '+' : '-'}${tx.amount.toFixed(2)}
+                        <span
+                          className={
+                            tx.type === 'topup'
+                              ? 'font-bold text-lg text-green-400'
+                              : 'font-bold text-lg text-red-400'
+                          }
+                        >
+                          {tx.type === 'topup' ? '+' : '-'}$
+                          {tx.amount.toFixed(2)}
                         </span>
                       </div>
                       <div className="text-slate-400 text-sm space-y-1">
-                        <p>Balance after: <span className="text-slate-300">${tx.balanceAfter.toFixed(2)}</span></p>
+                        <p>
+                          Balance after:{' '}
+                          <span className="text-slate-300">
+                            ${tx.balanceAfter.toFixed(2)}
+                          </span>
+                        </p>
                         <p>{new Date(tx.createdAt).toLocaleString()}</p>
-                        {tx.idempotencyKey && <p>Key: <code className="bg-slate-700 px-1 rounded text-xs">{tx.idempotencyKey}</code></p>}
+                        {tx.idempotencyKey && (
+                          <p>
+                            Key:{' '}
+                            <code className="bg-slate-700 px-1 rounded text-xs">
+                              {tx.idempotencyKey}
+                            </code>
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -427,35 +460,63 @@ export default function WalletDashboard() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
-                <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">1</span>
+                <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">
+                  1
+                </span>
                 Create Account
               </h3>
-              <code className="text-xs bg-slate-800 text-blue-300 px-2 py-1 rounded block mb-2">POST /api/trpc/createAccount</code>
-              <p className="text-slate-400 text-sm">Creates a new user account with email and name. Returns user ID and initial balance of $0.00.</p>
+              <code className="text-xs bg-slate-800 text-blue-300 px-2 py-1 rounded block mb-2">
+                POST /api/trpc/createAccount
+              </code>
+              <p className="text-slate-400 text-sm">
+                Creates a new user account with email and name. Returns user ID
+                and initial balance of $0.00.
+              </p>
             </div>
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
-                <span className="bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">2</span>
+                <span className="bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">
+                  2
+                </span>
                 Find User
               </h3>
-              <code className="text-xs bg-slate-800 text-purple-300 px-2 py-1 rounded block mb-2">GET /api/trpc/getUserByEmail</code>
-              <p className="text-slate-400 text-sm">Finds a user by email address and returns their ID and account information.</p>
+              <code className="text-xs bg-slate-800 text-purple-300 px-2 py-1 rounded block mb-2">
+                GET /api/trpc/getUserByEmail
+              </code>
+              <p className="text-slate-400 text-sm">
+                Finds a user by email address and returns their ID and account
+                information.
+              </p>
             </div>
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">3</span>
+                <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">
+                  3
+                </span>
                 Top-Up
               </h3>
-              <code className="text-xs bg-slate-800 text-green-300 px-2 py-1 rounded block mb-2">POST /api/trpc/topUp</code>
-              <p className="text-slate-400 text-sm">Adds balance to a user account. Supports idempotency keys for duplicate prevention.</p>
+              <code className="text-xs bg-slate-800 text-green-300 px-2 py-1 rounded block mb-2">
+                POST /api/trpc/topUp
+              </code>
+              <p className="text-slate-400 text-sm">
+                Adds balance to a user account. Automatically prevents duplicate
+                transactions.
+              </p>
             </div>
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
-                <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">4</span>
+                <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">
+                  4
+                </span>
                 Charge
               </h3>
-              <code className="text-xs bg-slate-800 text-red-300 px-2 py-1 rounded block mb-2">POST /api/trpc/charge</code>
-              <p className="text-slate-400 text-sm">Deducts balance from a user account. Prevents negative balances and supports idempotency keys.</p>
+              <code className="text-xs bg-slate-800 text-red-300 px-2 py-1 rounded block mb-2">
+                POST /api/trpc/charge
+              </code>
+              <p className="text-slate-400 text-sm">
+                Deducts balance from a user account. Prevents negative balances
+                and duplicate transactions.
+              </p>
             </div>
           </div>
         </div>

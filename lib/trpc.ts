@@ -97,10 +97,10 @@ export const appRouter = router({
         .refine(val => Number.isFinite(val) && val > 0, 'Amount must be a positive finite number')
         .refine(val => Math.round(val * 100) / 100 === val, 'Amount can only have up to 2 decimal places'),
       idempotencyKey: z.string()
-        .min(1, 'Please provide an idempotency key to prevent duplicate transactions')
+        .min(1, 'Idempotency key is required to prevent duplicate transactions')
         .max(255, 'Idempotency key is too long (maximum 255 characters)')
         .trim()
-        .refine(val => val.length > 0, 'Idempotency key cannot be empty - use the Generate button or enter a unique value'),
+        .refine(val => val.length > 0, 'Idempotency key cannot be empty'),
     }))
     .mutation(async ({ input }) => {
       const { userId, amount, idempotencyKey } = input;
@@ -202,10 +202,10 @@ export const appRouter = router({
         .refine(val => Number.isFinite(val) && val > 0, 'Amount must be a positive finite number')
         .refine(val => Math.round(val * 100) / 100 === val, 'Amount can only have up to 2 decimal places'),
       idempotencyKey: z.string()
-        .min(1, 'Please provide an idempotency key to prevent duplicate transactions')
+        .min(1, 'Idempotency key is required to prevent duplicate transactions')
         .max(255, 'Idempotency key is too long (maximum 255 characters)')
         .trim()
-        .refine(val => val.length > 0, 'Idempotency key cannot be empty - use the Generate button or enter a unique value'),
+        .refine(val => val.length > 0, 'Idempotency key cannot be empty'),
     }))
     .mutation(async ({ input }) => {
       const { userId, amount, idempotencyKey } = input;
