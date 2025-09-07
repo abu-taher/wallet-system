@@ -1,14 +1,14 @@
-import { createClient, type ResultSet } from '@libsql/client';
+import Database from 'better-sqlite3';
 import path from 'path';
 import type {
+  PreparedStatements,
   DatabaseConstants,
   CurrencyFormatter,
   AmountValidator,
   IdGenerator,
   ValidationResult,
   DatabaseOperation,
-  User,
-  Transaction,
+  TransactionOperation,
 } from './types';
 
 /**
@@ -28,17 +28,15 @@ const { DATABASE_FILE, CURRENCY_PRECISION, MAX_AMOUNT, MIN_AMOUNT } =
   DATABASE_CONFIG;
 
 // Initialize database connection
-// Use file:// URL for local development, memory for production
-const dbUrl = process.env.LIBSQL_URL 
-  ? process.env.LIBSQL_URL
-  : process.env.VERCEL
-  ? 'file:memory:'
-  : `file:${path.join(process.cwd(), DATABASE_FILE)}`;
+// Use temporary directory for Vercel deployment compatibility
+const dbPath = process.env.VERCEL
+  ? path.join('/tmp', DATABASE_FILE)
+  : path.join(process.cwd(), DATABASE_FILE);
 
-const db = createClient({
-  url: dbUrl,
-  authToken: process.env.LIBSQL_AUTH_TOKEN,
-});
+const db = new Database(dbPath);
+
+// Enable WAL mode for better concurrency and performance
+db.pragma('journal_mode = WAL');
 
 /**
  * Creates database tables and indexes for the wallet system
@@ -46,9 +44,9 @@ const db = createClient({
  * - Transactions table: audit trail with idempotency support
  * - Indexes: optimized for common query patterns
  */
-const createTables = async () => {
+const createTables = () => {
   // Users table - stores account information and current balance
-  await db.execute(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -59,7 +57,7 @@ const createTables = async () => {
   `);
 
   // Transactions table - audit trail and duplicate prevention
-  await db.execute(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS transactions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -73,93 +71,48 @@ const createTables = async () => {
   `);
 
   // Performance indexes for common query patterns
-  await db.execute(`
+  db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
-  `);
-  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id);
-  `);
-  await db.execute(`
     CREATE INDEX IF NOT EXISTS idx_transactions_idempotency_key ON transactions (idempotency_key);
   `);
 };
 
-// Initialize tables (async operation)
-// Only initialize if not in build mode
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL_ENV) {
-  createTables().catch(console.error);
-}
+// Initialize tables
+createTables();
 
-// Database operation functions (replacing prepared statements)
-const statements = {
-  createUser: async (id: string, email: string, name: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'INSERT INTO users (id, email, name, balance) VALUES (?, ?, ?, 0.00)',
-      args: [id, email, name]
-    });
-  },
+// Prepared statements for better performance and security
+const statements: PreparedStatements = {
+  createUser: db.prepare(`
+    INSERT INTO users (id, email, name, balance)
+    VALUES (?, ?, ?, 0.00)
+  `),
 
-  getUserById: async (id: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'SELECT * FROM users WHERE id = ?',
-      args: [id]
-    });
-  },
+  getUserById: db.prepare(`
+    SELECT * FROM users WHERE id = ?
+  `),
 
-  getUserByEmail: async (email: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'SELECT * FROM users WHERE email = ?',
-      args: [email]
-    });
-  },
+  getUserByEmail: db.prepare(`
+    SELECT * FROM users WHERE email = ?
+  `),
 
-  updateBalance: async (balance: number, id: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'UPDATE users SET balance = ? WHERE id = ?',
-      args: [balance, id]
-    });
-  },
+  updateBalance: db.prepare(`
+    UPDATE users SET balance = ? WHERE id = ?
+  `),
 
-  createTransaction: async (id: string, userId: string, type: string, amount: number, balanceAfter: number, idempotencyKey: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'INSERT INTO transactions (id, user_id, type, amount, balance_after, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
-      args: [id, userId, type, amount, balanceAfter, idempotencyKey]
-    });
-  },
+  createTransaction: db.prepare(`
+    INSERT INTO transactions (id, user_id, type, amount, balance_after, idempotency_key)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `),
 
-  getTransactionByIdempotencyKey: async (key: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'SELECT * FROM transactions WHERE idempotency_key = ?',
-      args: [key]
-    });
-  },
+  getTransactionByIdempotencyKey: db.prepare(`
+    SELECT * FROM transactions WHERE idempotency_key = ?
+  `),
 
-  getUserTransactions: async (userId: string): Promise<ResultSet> => {
-    return db.execute({
-      sql: 'SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC',
-      args: [userId]
-    });
-  },
+  getUserTransactions: db.prepare(`
+    SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC
+  `),
 };
-
-// Helper functions to convert libsql Values to proper types
-export const convertToUser = (row: Record<string, unknown>): User => ({
-  id: String(row.id),
-  email: String(row.email),
-  name: String(row.name),
-  balance: Number(row.balance),
-  created_at: String(row.created_at),
-});
-
-export const convertToTransaction = (row: Record<string, unknown>): Transaction => ({
-  id: String(row.id),
-  user_id: String(row.user_id),
-  type: String(row.type) as 'topup' | 'charge',
-  amount: Number(row.amount),
-  balance_after: Number(row.balance_after),
-  idempotency_key: row.idempotency_key ? String(row.idempotency_key) : null,
-  created_at: String(row.created_at),
-});
 
 export { db, statements };
 
@@ -274,23 +227,11 @@ export const executeDatabaseOperation = <T>(
  * Executes a transaction operation within a database transaction
  * @param operation - Transaction operation to execute
  */
-export const executeTransactionOperation = async (
-  operation: () => Promise<void>
-): Promise<void> => {
-  await db.batch([
-    { sql: 'BEGIN', args: [] },
-  ]);
-  try {
-    await operation();
-    await db.batch([
-      { sql: 'COMMIT', args: [] },
-    ]);
-  } catch (error) {
-    await db.batch([
-      { sql: 'ROLLBACK', args: [] },
-    ]);
-    throw error;
-  }
+export const executeTransactionOperation = (
+  operation: TransactionOperation
+): void => {
+  const transaction = db.transaction(operation);
+  transaction();
 };
 
 // Export constants for use in other modules

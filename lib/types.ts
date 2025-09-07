@@ -105,6 +105,7 @@ export interface DatabaseConstants {
 
 // Utility Types
 export type DatabaseOperation<T> = () => T;
+export type TransactionOperation = () => void;
 
 // Error Types
 export interface WalletError {
@@ -125,13 +126,15 @@ export interface TRPCContext {
   res?: Response;
 }
 
-// Database Statement Types (updated for libsql async interface)
-export interface LibSQLResultSet<T = Record<string, unknown>> {
-  rows: T[];
-  columns: string[];
-  columnTypes: string[];
-  rowsAffected: number;
-  lastInsertRowid?: bigint;
+// Database Statement Types
+export interface PreparedStatements {
+  createUser: { run(userId: string, email: string, name: string): void };
+  getUserById: { get(userId: string): User | undefined };
+  getUserByEmail: { get(email: string): User | undefined };
+  updateBalance: { run(balance: number, userId: string): void };
+  createTransaction: { run(id: string, userId: string, type: string, amount: number, balanceAfter: number, idempotencyKey: string): void };
+  getTransactionByIdempotencyKey: { get(key: string): Transaction | undefined };
+  getUserTransactions: { all(userId: string): Transaction[] };
 }
 
 // Currency Utility Types
