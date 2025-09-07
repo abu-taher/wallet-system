@@ -12,10 +12,22 @@ A simple wallet system API built with Next.js 15, tRPC, and SQLite that manages 
 - **SQLite Database**: Persistent storage with proper schema and indexing
 - **Type-Safe API**: Built with tRPC for end-to-end type safety
 
-## API Endpoints
+## API Architecture
+
+This wallet system provides **two API interfaces** for maximum flexibility:
+
+### 1. **REST API** (Recommended for External Integrations)
+Clean, standard REST endpoints with simple JSON payloads - perfect for curl, Postman, and third-party integrations.
+
+### 2. **tRPC API** (Used by Web Interface)
+Type-safe, modern API used internally by the web interface for optimal developer experience and end-to-end type safety.
+
+---
+
+## REST API Endpoints
 
 ### 1. Create Account
-- **Endpoint**: `POST /api/trpc/createAccount`
+- **Endpoint**: `POST /api/account/create`
 - **Purpose**: Creates a new user account
 - **Input**:
   ```json
@@ -34,8 +46,27 @@ A simple wallet system API built with Next.js 15, tRPC, and SQLite that manages 
   }
   ```
 
-### 2. Top-Up
-- **Endpoint**: `POST /api/trpc/topUp`
+### 2. Find User by Email
+- **Endpoint**: `POST /api/account/find`
+- **Purpose**: Find a user account by email address
+- **Input**:
+  ```json
+  {
+    "email": "user@example.com"
+  }
+  ```
+- **Output**:
+  ```json
+  {
+    "id": "user_id",
+    "email": "user@example.com", 
+    "name": "John Doe",
+    "balance": 150.25
+  }
+  ```
+
+### 3. Top-Up
+- **Endpoint**: `POST /api/account/topup`
 - **Purpose**: Add balance to a user account
 - **Input**:
   ```json
@@ -56,8 +87,8 @@ A simple wallet system API built with Next.js 15, tRPC, and SQLite that manages 
   }
   ```
 
-### 3. Charge
-- **Endpoint**: `POST /api/trpc/charge`
+### 4. Charge
+- **Endpoint**: `POST /api/account/charge`
 - **Purpose**: Deduct balance from a user account
 - **Input**:
   ```json
@@ -77,6 +108,29 @@ A simple wallet system API built with Next.js 15, tRPC, and SQLite that manages 
     "duplicate": false
   }
   ```
+
+### Example curl Commands
+```bash
+# Create Account
+curl -X POST http://localhost:3000/api/account/create \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","name":"Test User"}'
+
+# Find User
+curl -X POST http://localhost:3000/api/account/find \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com"}'
+
+# Top-Up
+curl -X POST http://localhost:3000/api/account/topup \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user_id","amount":100.00,"idempotencyKey":"topup_123"}'
+
+# Charge
+curl -X POST http://localhost:3000/api/account/charge \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user_id","amount":25.50,"idempotencyKey":"charge_456"}'
+```
 
 ## Data Considerations
 
@@ -127,28 +181,28 @@ The SQLite database file (`wallet.sqlite`) will be created in the project root w
 
 ### Testing the API
 
-1. **Use the Web Interface**:
+1. **Web Interface (Recommended)**:
    - Navigate to `http://localhost:3000`
-   - Use the form interface to test all three endpoints
-   - View real-time balance updates and transaction history
+   - Use the interactive form interface to test all three endpoints
+   - Features include:
+     - Real-time balance updates
+     - Transaction history display
+     - User-friendly forms with validation
+     - Error handling with clear messages
+     - Beautiful responsive design
 
-2. **Direct API Calls**:
-   ```bash
-   # Create Account
-   curl -X POST http://localhost:3000/api/trpc/createAccount \
-     -H "Content-Type: application/json" \
-     -d '{"email":"test@example.com","name":"Test User"}'
+2. **Postman Collection**:
+   - Import `wallet-system-api.postman_collection.json` into Postman
+   - Pre-configured requests for all REST endpoints with clean JSON format
+   - Automated test assertions for success/error cases
+   - Duplicate transaction testing
+   - Edge case validation examples (insufficient funds, invalid amounts)
+   - Global variables for seamless workflow testing
 
-   # Top-Up
-   curl -X POST http://localhost:3000/api/trpc/topUp \
-     -H "Content-Type: application/json" \
-     -d '{"userId":"user_id","amount":100.00,"idempotencyKey":"topup_123"}'
-
-   # Charge
-   curl -X POST http://localhost:3000/api/trpc/charge \
-     -H "Content-Type: application/json" \
-     -d '{"userId":"user_id","amount":25.50,"idempotencyKey":"charge_456"}'
-   ```
+3. **Direct curl Commands**:
+   - See the curl examples above for direct API testing
+   - All endpoints use simple JSON format - no complex nested objects
+   - Easy to integrate with any programming language or tool
 
 ### Production Build
 
@@ -165,7 +219,13 @@ npm start
 ```
 wallet-system/
 ├── app/
-│   ├── api/trpc/[trpc]/route.ts    # tRPC API handler
+│   ├── api/
+│   │   ├── account/                # REST API endpoints
+│   │   │   ├── create/route.ts     # POST /api/account/create
+│   │   │   ├── find/route.ts       # POST /api/account/find  
+│   │   │   ├── topup/route.ts      # POST /api/account/topup
+│   │   │   └── charge/route.ts     # POST /api/account/charge
+│   │   └── trpc/[trpc]/route.ts    # tRPC API handler
 │   ├── globals.css                 # Tailwind styles
 │   ├── layout.tsx                  # Root layout with providers
 │   └── page.tsx                    # Main page
@@ -177,6 +237,7 @@ wallet-system/
 │   ├── trpc.ts                     # tRPC router and endpoints
 │   └── trpc-client.ts              # Client-side tRPC
 ├── wallet.sqlite                   # SQLite database (auto-created)
+├── wallet-system-api.postman_collection.json  # Postman collection
 └── README.md                       # This file
 ```
 
@@ -222,7 +283,7 @@ The API implements comprehensive error handling for all edge cases:
 - **Rate limiting ready**: Architecture supports rate limiting middleware
 - **No sensitive data in errors**: Error messages never expose internal details
 
-For comprehensive edge case testing examples, see `test-edge-cases.md`.
+The included Postman collection provides comprehensive edge case testing examples.
 
 ## Security Considerations
 
