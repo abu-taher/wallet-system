@@ -97,10 +97,10 @@ export const appRouter = router({
         .refine(val => Number.isFinite(val) && val > 0, 'Amount must be a positive finite number')
         .refine(val => Math.round(val * 100) / 100 === val, 'Amount can only have up to 2 decimal places'),
       idempotencyKey: z.string()
-        .min(1, 'Idempotency key is required')
-        .max(255, 'Idempotency key too long')
+        .min(1, 'Please provide an idempotency key to prevent duplicate transactions')
+        .max(255, 'Idempotency key is too long (maximum 255 characters)')
         .trim()
-        .refine(val => val.length > 0, 'Idempotency key cannot be empty string'),
+        .refine(val => val.length > 0, 'Idempotency key cannot be empty - use the Generate button or enter a unique value'),
     }))
     .mutation(async ({ input }) => {
       const { userId, amount, idempotencyKey } = input;
@@ -202,10 +202,10 @@ export const appRouter = router({
         .refine(val => Number.isFinite(val) && val > 0, 'Amount must be a positive finite number')
         .refine(val => Math.round(val * 100) / 100 === val, 'Amount can only have up to 2 decimal places'),
       idempotencyKey: z.string()
-        .min(1, 'Idempotency key is required')
-        .max(255, 'Idempotency key too long')
+        .min(1, 'Please provide an idempotency key to prevent duplicate transactions')
+        .max(255, 'Idempotency key is too long (maximum 255 characters)')
         .trim()
-        .refine(val => val.length > 0, 'Idempotency key cannot be empty string'),
+        .refine(val => val.length > 0, 'Idempotency key cannot be empty - use the Generate button or enter a unique value'),
     }))
     .mutation(async ({ input }) => {
       const { userId, amount, idempotencyKey } = input;
@@ -306,6 +306,31 @@ export const appRouter = router({
     }),
 
   // Helper endpoints for testing/admin
+  getUserByEmail: publicProcedure
+    .input(z.object({ 
+      email: z.string()
+        .email('Invalid email format')
+        .min(3, 'Email must be at least 3 characters')
+        .max(255, 'Email must be less than 255 characters')
+        .trim()
+        .toLowerCase()
+    }))
+    .query(async ({ input }) => {
+      const user = statements.getUserByEmail.get(input.email) as any;
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No user found with this email address',
+        });
+      }
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        balance: formatCurrency(user.balance),
+      };
+    }),
+
   getUser: publicProcedure
     .input(z.object({ 
       userId: z.string()

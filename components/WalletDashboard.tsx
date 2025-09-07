@@ -6,6 +6,7 @@ import { trpc } from '../lib/trpc-client';
 export default function WalletDashboard() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [searchEmail, setSearchEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
   const [idempotencyKey, setIdempotencyKey] = useState('');
@@ -46,6 +47,25 @@ export default function WalletDashboard() {
     }
   });
 
+  const [shouldSearchUser, setShouldSearchUser] = useState(false);
+
+  const { data: searchedUser, error: searchError, isFetching: isSearching } = trpc.getUserByEmail.useQuery(
+    { email: searchEmail },
+    { 
+      enabled: shouldSearchUser && !!searchEmail,
+      onSuccess: (data) => {
+        setResult(data);
+        setUserId(data.id);
+        setShouldSearchUser(false);
+        utils.getUser.invalidate();
+      },
+      onError: (error) => {
+        setResult({ error: error.message });
+        setShouldSearchUser(false);
+      }
+    }
+  );
+
   const { data: user } = trpc.getUser.useQuery(
     { userId },
     { enabled: !!userId }
@@ -82,6 +102,13 @@ export default function WalletDashboard() {
         amount: parseFloat(amount),
         idempotencyKey: idempotencyKey || undefined,
       });
+    }
+  };
+
+  const handleGetUserByEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchEmail) {
+      setShouldSearchUser(true);
     }
   };
 
@@ -146,10 +173,43 @@ export default function WalletDashboard() {
               </form>
             </div>
 
+            {/* Get User ID by Email */}
+            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
+                <span className="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">🔍</span>
+                Find User by Email
+              </h2>
+              <form onSubmit={handleGetUserByEmail} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Email Address</label>
+                  <input
+                    type="email"
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    className="w-full bg-slate-900/50 border border-slate-600 text-white rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    placeholder="Enter email to find user ID"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSearching}
+                  className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3 rounded-lg hover:from-purple-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] font-medium"
+                >
+                  {isSearching ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Searching...
+                    </div>
+                  ) : 'Find User'}
+                </button>
+              </form>
+            </div>
+
             {/* Top-Up */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">2</span>
+                <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
                 Top-Up (Add Balance)
               </h2>
               <form onSubmit={handleTopUp} className="space-y-4">
@@ -180,7 +240,7 @@ export default function WalletDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Idempotency Key (Optional)
+                    Idempotency Key
                     <button
                       type="button"
                       onClick={generateIdempotencyKey}
@@ -215,7 +275,7 @@ export default function WalletDashboard() {
             {/* Charge */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">3</span>
+                <span className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">4</span>
                 Charge (Deduct Balance)
               </h2>
               <form onSubmit={handleCharge} className="space-y-4">
@@ -246,7 +306,7 @@ export default function WalletDashboard() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Idempotency Key (Optional)
+                    Idempotency Key
                     <button
                       type="button"
                       onClick={generateIdempotencyKey}
@@ -364,7 +424,7 @@ export default function WalletDashboard() {
             <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg mr-3"></div>
             API Endpoints
           </h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
                 <span className="bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">1</span>
@@ -375,7 +435,15 @@ export default function WalletDashboard() {
             </div>
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
-                <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">2</span>
+                <span className="bg-purple-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">2</span>
+                Find User
+              </h3>
+              <code className="text-xs bg-slate-800 text-purple-300 px-2 py-1 rounded block mb-2">GET /api/trpc/getUserByEmail</code>
+              <p className="text-slate-400 text-sm">Finds a user by email address and returns their ID and account information.</p>
+            </div>
+            <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
+              <h3 className="font-semibold text-white mb-2 flex items-center">
+                <span className="bg-green-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">3</span>
                 Top-Up
               </h3>
               <code className="text-xs bg-slate-800 text-green-300 px-2 py-1 rounded block mb-2">POST /api/trpc/topUp</code>
@@ -383,7 +451,7 @@ export default function WalletDashboard() {
             </div>
             <div className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all">
               <h3 className="font-semibold text-white mb-2 flex items-center">
-                <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">3</span>
+                <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2">4</span>
                 Charge
               </h3>
               <code className="text-xs bg-slate-800 text-red-300 px-2 py-1 rounded block mb-2">POST /api/trpc/charge</code>
