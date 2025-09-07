@@ -97,10 +97,10 @@ export const appRouter = router({
         .refine(val => Number.isFinite(val) && val > 0, 'Amount must be a positive finite number')
         .refine(val => Math.round(val * 100) / 100 === val, 'Amount can only have up to 2 decimal places'),
       idempotencyKey: z.string()
+        .min(1, 'Idempotency key is required')
         .max(255, 'Idempotency key too long')
         .trim()
-        .optional()
-        .refine(val => !val || val.length > 0, 'Idempotency key cannot be empty string'),
+        .refine(val => val.length > 0, 'Idempotency key cannot be empty string'),
     }))
     .mutation(async ({ input }) => {
       const { userId, amount, idempotencyKey } = input;
@@ -115,20 +115,18 @@ export const appRouter = router({
       
       const formattedAmount = formatCurrency(amount);
       
-      // Check for duplicate transaction if idempotency key provided
-      if (idempotencyKey) {
-        const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
-        if (existingTransaction) {
-          // Return the existing transaction result
-          const user = statements.getUserById.get(userId) as any;
-          return {
-            success: true,
-            transactionId: (existingTransaction as any).id,
-            newBalance: formatCurrency(user.balance),
-            amount: formatCurrency((existingTransaction as any).amount),
-            duplicate: true,
-          };
-        }
+      // Check for duplicate transaction
+      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
+      if (existingTransaction) {
+        // Return the existing transaction result
+        const user = statements.getUserById.get(userId) as any;
+        return {
+          success: true,
+          transactionId: (existingTransaction as any).id,
+          newBalance: formatCurrency(user.balance),
+          amount: formatCurrency((existingTransaction as any).amount),
+          duplicate: true,
+        };
       }
       
       // Get user
@@ -156,7 +154,7 @@ export const appRouter = router({
             'topup',
             formattedAmount,
             newBalance,
-            idempotencyKey || null
+            idempotencyKey
           );
         });
         
@@ -170,7 +168,7 @@ export const appRouter = router({
           duplicate: false,
         };
       } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && idempotencyKey) {
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           // Race condition: another request with same idempotency key succeeded
           const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
           const updatedUser = statements.getUserById.get(userId) as any;
@@ -204,10 +202,10 @@ export const appRouter = router({
         .refine(val => Number.isFinite(val) && val > 0, 'Amount must be a positive finite number')
         .refine(val => Math.round(val * 100) / 100 === val, 'Amount can only have up to 2 decimal places'),
       idempotencyKey: z.string()
+        .min(1, 'Idempotency key is required')
         .max(255, 'Idempotency key too long')
         .trim()
-        .optional()
-        .refine(val => !val || val.length > 0, 'Idempotency key cannot be empty string'),
+        .refine(val => val.length > 0, 'Idempotency key cannot be empty string'),
     }))
     .mutation(async ({ input }) => {
       const { userId, amount, idempotencyKey } = input;
@@ -222,20 +220,18 @@ export const appRouter = router({
       
       const formattedAmount = formatCurrency(amount);
       
-      // Check for duplicate transaction if idempotency key provided
-      if (idempotencyKey) {
-        const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
-        if (existingTransaction) {
-          // Return the existing transaction result
-          const user = statements.getUserById.get(userId) as any;
-          return {
-            success: true,
-            transactionId: (existingTransaction as any).id,
-            newBalance: formatCurrency(user.balance),
-            amount: formatCurrency((existingTransaction as any).amount),
-            duplicate: true,
-          };
-        }
+      // Check for duplicate transaction
+      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
+      if (existingTransaction) {
+        // Return the existing transaction result
+        const user = statements.getUserById.get(userId) as any;
+        return {
+          success: true,
+          transactionId: (existingTransaction as any).id,
+          newBalance: formatCurrency(user.balance),
+          amount: formatCurrency((existingTransaction as any).amount),
+          duplicate: true,
+        };
       }
       
       // Get user
@@ -279,7 +275,7 @@ export const appRouter = router({
             'charge',
             formattedAmount,
             newBalance,
-            idempotencyKey || null
+            idempotencyKey
           );
         });
         
@@ -293,7 +289,7 @@ export const appRouter = router({
           duplicate: false,
         };
       } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE' && idempotencyKey) {
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           // Race condition: another request with same idempotency key succeeded
           const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
           const updatedUser = statements.getUserById.get(userId) as any;

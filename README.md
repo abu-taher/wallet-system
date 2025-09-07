@@ -42,7 +42,7 @@ A simple wallet system API built with Next.js 15, tRPC, and SQLite that manages 
   {
     "userId": "user_id",
     "amount": 100.50,
-    "idempotencyKey": "optional_unique_key"
+    "idempotencyKey": "topup_unique_key_123"
   }
   ```
 - **Output**:
@@ -64,7 +64,7 @@ A simple wallet system API built with Next.js 15, tRPC, and SQLite that manages 
   {
     "userId": "user_id",
     "amount": 25.75,
-    "idempotencyKey": "optional_unique_key"
+    "idempotencyKey": "charge_unique_key_456"
   }
   ```
 - **Output**:
@@ -142,12 +142,12 @@ The SQLite database file (`wallet.sqlite`) will be created in the project root w
    # Top-Up
    curl -X POST http://localhost:3000/api/trpc/topUp \
      -H "Content-Type: application/json" \
-     -d '{"userId":"user_id","amount":100.00}'
+     -d '{"userId":"user_id","amount":100.00,"idempotencyKey":"topup_123"}'
 
    # Charge
    curl -X POST http://localhost:3000/api/trpc/charge \
      -H "Content-Type: application/json" \
-     -d '{"userId":"user_id","amount":25.50}'
+     -d '{"userId":"user_id","amount":25.50,"idempotencyKey":"charge_456"}'
    ```
 
 ### Production Build
