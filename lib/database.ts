@@ -29,7 +29,11 @@ const DATABASE_CONFIG: DatabaseConstants = {
 const { DATABASE_FILE, CURRENCY_PRECISION, MAX_AMOUNT, MIN_AMOUNT } = DATABASE_CONFIG;
 
 // Initialize database connection
-const dbPath = path.join(process.cwd(), DATABASE_FILE);
+// Use temporary directory for Vercel deployment compatibility
+const dbPath = process.env.VERCEL 
+  ? path.join('/tmp', DATABASE_FILE)
+  : path.join(process.cwd(), DATABASE_FILE);
+
 const db = new Database(dbPath);
 
 // Enable WAL mode for better concurrency and performance
