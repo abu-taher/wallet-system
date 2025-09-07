@@ -10,6 +10,20 @@ import {
   MIN_AMOUNT,
   MAX_AMOUNT 
 } from './database';
+import type {
+  User,
+  Transaction,
+  TRPCContext,
+  UserResponse,
+  TransactionResponse,
+  TransactionHistoryItem,
+  CreateAccountRequest,
+  TopUpRequest,
+  ChargeRequest,
+  GetUserByEmailRequest,
+  GetUserRequest,
+  GetUserTransactionsRequest
+} from './types';
 
 /**
  * tRPC Router for Wallet System API
@@ -17,7 +31,7 @@ import {
  * Features: type safety, currency precision, duplicate prevention
  */
 
-export const createTRPCContext = async (opts: { req?: any; res?: any }) => {
+export const createTRPCContext = async (opts: TRPCContext) => {
   return {};
 };
 
@@ -44,12 +58,12 @@ export const appRouter = router({
         .trim()
         .refine(val => val.length > 0, 'Name cannot be empty or whitespace only'),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input }: { input: CreateAccountRequest }) => {
       const userId = generateId();
       
       try {
         // Check if user already exists
-        const existingUser = statements.getUserByEmail.get(input.email);
+        const existingUser = statements.getUserByEmail.get(input.email) as User | undefined;
         if (existingUser) {
           throw new TRPCError({
             code: 'CONFLICT',
@@ -60,13 +74,13 @@ export const appRouter = router({
         // Create new user
         statements.createUser.run(userId, input.email, input.name);
         
-        const newUser = statements.getUserById.get(userId) as any;
+        const newUser = statements.getUserById.get(userId) as User;
         return {
           id: newUser.id,
           email: newUser.email,
           name: newUser.name,
           balance: formatCurrency(newUser.balance),
-        };
+        } satisfies UserResponse;
       } catch (error: any) {
         if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           throw new TRPCError({
@@ -102,7 +116,7 @@ export const appRouter = router({
         .trim()
         .refine(val => val.length > 0, 'Idempotency key cannot be empty'),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input }: { input: TopUpRequest }) => {
       const { userId, amount, idempotencyKey } = input;
       
       // Validate amount
@@ -116,21 +130,21 @@ export const appRouter = router({
       const formattedAmount = formatCurrency(amount);
       
       // Check for duplicate transaction
-      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
+      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction | undefined;
       if (existingTransaction) {
         // Return the existing transaction result
-        const user = statements.getUserById.get(userId) as any;
+        const user = statements.getUserById.get(userId) as User;
         return {
           success: true,
-          transactionId: (existingTransaction as any).id,
+          transactionId: existingTransaction.id,
           newBalance: formatCurrency(user.balance),
-          amount: formatCurrency((existingTransaction as any).amount),
+          amount: formatCurrency(existingTransaction.amount),
           duplicate: true,
-        };
+        } satisfies TransactionResponse;
       }
       
       // Get user
-      const user = statements.getUserById.get(userId) as any;
+      const user = statements.getUserById.get(userId) as User | undefined;
       if (!user) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -166,19 +180,19 @@ export const appRouter = router({
           newBalance,
           amount: formattedAmount,
           duplicate: false,
-        };
+        } satisfies TransactionResponse;
       } catch (error: any) {
         if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           // Race condition: another request with same idempotency key succeeded
-          const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
-          const updatedUser = statements.getUserById.get(userId) as any;
+          const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction;
+          const updatedUser = statements.getUserById.get(userId) as User;
           return {
             success: true,
-            transactionId: (existingTransaction as any).id,
+            transactionId: existingTransaction.id,
             newBalance: formatCurrency(updatedUser.balance),
-            amount: formatCurrency((existingTransaction as any).amount),
+            amount: formatCurrency(existingTransaction.amount),
             duplicate: true,
-          };
+          } satisfies TransactionResponse;
         }
         throw error;
       }
@@ -207,7 +221,7 @@ export const appRouter = router({
         .trim()
         .refine(val => val.length > 0, 'Idempotency key cannot be empty'),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input }: { input: ChargeRequest }) => {
       const { userId, amount, idempotencyKey } = input;
       
       // Validate amount
@@ -221,21 +235,21 @@ export const appRouter = router({
       const formattedAmount = formatCurrency(amount);
       
       // Check for duplicate transaction
-      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
+      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction | undefined;
       if (existingTransaction) {
         // Return the existing transaction result
-        const user = statements.getUserById.get(userId) as any;
+        const user = statements.getUserById.get(userId) as User;
         return {
           success: true,
-          transactionId: (existingTransaction as any).id,
+          transactionId: existingTransaction.id,
           newBalance: formatCurrency(user.balance),
-          amount: formatCurrency((existingTransaction as any).amount),
+          amount: formatCurrency(existingTransaction.amount),
           duplicate: true,
-        };
+        } satisfies TransactionResponse;
       }
       
       // Get user
-      const user = statements.getUserById.get(userId) as any;
+      const user = statements.getUserById.get(userId) as User | undefined;
       if (!user) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -287,19 +301,19 @@ export const appRouter = router({
           newBalance,
           amount: formattedAmount,
           duplicate: false,
-        };
+        } satisfies TransactionResponse;
       } catch (error: any) {
         if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           // Race condition: another request with same idempotency key succeeded
-          const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey);
-          const updatedUser = statements.getUserById.get(userId) as any;
+          const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction;
+          const updatedUser = statements.getUserById.get(userId) as User;
           return {
             success: true,
-            transactionId: (existingTransaction as any).id,
+            transactionId: existingTransaction.id,
             newBalance: formatCurrency(updatedUser.balance),
-            amount: formatCurrency((existingTransaction as any).amount),
+            amount: formatCurrency(existingTransaction.amount),
             duplicate: true,
-          };
+          } satisfies TransactionResponse;
         }
         throw error;
       }
@@ -315,8 +329,8 @@ export const appRouter = router({
         .trim()
         .toLowerCase()
     }))
-    .query(async ({ input }) => {
-      const user = statements.getUserByEmail.get(input.email) as any;
+    .query(async ({ input }: { input: GetUserByEmailRequest }) => {
+      const user = statements.getUserByEmail.get(input.email) as User | undefined;
       if (!user) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -328,7 +342,7 @@ export const appRouter = router({
         email: user.email,
         name: user.name,
         balance: formatCurrency(user.balance),
-      };
+      } satisfies UserResponse;
     }),
 
   getUser: publicProcedure
@@ -339,8 +353,8 @@ export const appRouter = router({
         .trim()
         .refine(val => val.length > 0, 'User ID cannot be empty')
     }))
-    .query(async ({ input }) => {
-      const user = statements.getUserById.get(input.userId) as any;
+    .query(async ({ input }: { input: GetUserRequest }) => {
+      const user = statements.getUserById.get(input.userId) as User | undefined;
       if (!user) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -352,7 +366,7 @@ export const appRouter = router({
         email: user.email,
         name: user.name,
         balance: formatCurrency(user.balance),
-      };
+      } satisfies UserResponse;
     }),
 
   getUserTransactions: publicProcedure
@@ -363,8 +377,8 @@ export const appRouter = router({
         .trim()
         .refine(val => val.length > 0, 'User ID cannot be empty')
     }))
-    .query(async ({ input }) => {
-      const user = statements.getUserById.get(input.userId) as any;
+    .query(async ({ input }: { input: GetUserTransactionsRequest }) => {
+      const user = statements.getUserById.get(input.userId) as User | undefined;
       if (!user) {
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -372,7 +386,7 @@ export const appRouter = router({
         });
       }
       
-      const transactions = statements.getUserTransactions.all(input.userId) as any[];
+      const transactions = statements.getUserTransactions.all(input.userId) as Transaction[];
       return transactions.map(tx => ({
         id: tx.id,
         type: tx.type,
@@ -380,7 +394,7 @@ export const appRouter = router({
         balanceAfter: formatCurrency(tx.balance_after),
         createdAt: tx.created_at,
         idempotencyKey: tx.idempotency_key,
-      }));
+      } satisfies TransactionHistoryItem));
     }),
 });
 

@@ -1,5 +1,17 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import type {
+  User,
+  Transaction,
+  PreparedStatements,
+  DatabaseConstants,
+  CurrencyFormatter,
+  AmountValidator,
+  IdGenerator,
+  ValidationResult,
+  DatabaseOperation,
+  TransactionOperation
+} from './types';
 
 /**
  * SQLite database setup for wallet system
@@ -7,10 +19,14 @@ import path from 'path';
  */
 
 // Database configuration constants
-const DATABASE_FILE = 'wallet.sqlite';
-const CURRENCY_PRECISION = 100; // For 2 decimal places
-const MAX_AMOUNT = 999999.99;
-const MIN_AMOUNT = 0.01;
+const DATABASE_CONFIG: DatabaseConstants = {
+  DATABASE_FILE: 'wallet.sqlite',
+  CURRENCY_PRECISION: 100, // For 2 decimal places
+  MAX_AMOUNT: 999999.99,
+  MIN_AMOUNT: 0.01
+} as const;
+
+const { DATABASE_FILE, CURRENCY_PRECISION, MAX_AMOUNT, MIN_AMOUNT } = DATABASE_CONFIG;
 
 // Initialize database connection
 const dbPath = path.join(process.cwd(), DATABASE_FILE);
@@ -63,7 +79,7 @@ const createTables = () => {
 createTables();
 
 // Prepared statements for better performance and security
-const statements = {
+const statements: PreparedStatements = {
   createUser: db.prepare(`
     INSERT INTO users (id, email, name, balance)
     VALUES (?, ?, ?, 0.00)
@@ -109,7 +125,7 @@ export { db, statements };
  * @param amount - Raw number amount
  * @returns Number formatted to 2 decimal places
  */
-export const formatCurrency = (amount: number): number => {
+export const formatCurrency: CurrencyFormatter = (amount: number): number => {
   return Math.round(amount * CURRENCY_PRECISION) / CURRENCY_PRECISION;
 };
 
@@ -118,7 +134,7 @@ export const formatCurrency = (amount: number): number => {
  * @param amount - Amount to validate
  * @returns true if amount is valid, false otherwise
  */
-export const validateAmount = (amount: number): boolean => {
+export const validateAmount: AmountValidator = (amount: number): boolean => {
   // Check for valid number
   if (typeof amount !== 'number' || !Number.isFinite(amount) || isNaN(amount)) {
     return false;
@@ -144,12 +160,69 @@ export const validateAmount = (amount: number): boolean => {
 };
 
 /**
+ * Enhanced validation with detailed error messages
+ * @param amount - Amount to validate
+ * @returns ValidationResult with detailed error information
+ */
+export const validateAmountDetailed = (amount: number): ValidationResult => {
+  // Check for valid number
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || isNaN(amount)) {
+    return { isValid: false, error: 'Amount must be a valid number' };
+  }
+  
+  // Check for positive amount
+  if (amount <= 0) {
+    return { isValid: false, error: 'Amount must be positive' };
+  }
+  
+  // Check range
+  if (amount < MIN_AMOUNT) {
+    return { isValid: false, error: `Amount must be at least $${MIN_AMOUNT}` };
+  }
+  
+  if (amount > MAX_AMOUNT) {
+    return { isValid: false, error: `Amount must be at most $${MAX_AMOUNT}` };
+  }
+  
+  // Check decimal precision (max 2 decimal places)
+  const decimalPlaces = (amount.toString().split('.')[1] || '').length;
+  if (decimalPlaces > 2) {
+    return { isValid: false, error: 'Amount can only have up to 2 decimal places' };
+  }
+  
+  return { isValid: true };
+};
+
+/**
  * Generates cryptographically random unique identifier
  * Combines timestamp and random string for uniqueness
  * @returns Unique string identifier
  */
-export const generateId = (): string => {
+export const generateId: IdGenerator = (): string => {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);
+};
+
+/**
+ * Safely executes a database operation with error handling
+ * @param operation - Database operation to execute
+ * @returns Result of the operation
+ */
+export const executeDatabaseOperation = <T>(operation: DatabaseOperation<T>): T => {
+  try {
+    return operation();
+  } catch (error) {
+    console.error('Database operation failed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Executes a transaction operation within a database transaction
+ * @param operation - Transaction operation to execute
+ */
+export const executeTransactionOperation = (operation: TransactionOperation): void => {
+  const transaction = db.transaction(operation);
+  transaction();
 };
 
 // Export constants for use in other modules

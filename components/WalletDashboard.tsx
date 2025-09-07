@@ -2,6 +2,14 @@
 
 import { useState } from 'react';
 import { trpc } from '../lib/trpc-client';
+import type {
+  UserResponse,
+  TransactionResponse,
+  TransactionHistoryItem,
+  WalletFormData,
+  FormState,
+  WalletError
+} from '../lib/types';
 
 export default function WalletDashboard() {
   const [email, setEmail] = useState('');
@@ -9,7 +17,7 @@ export default function WalletDashboard() {
   const [searchEmail, setSearchEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ error?: string } | UserResponse | TransactionResponse | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -79,14 +87,14 @@ export default function WalletDashboard() {
     { enabled: !!userId }
   );
 
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCreateAccount = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (email && name) {
       createAccount.mutate({ email, name });
     }
   };
 
-  const handleTopUp = (e: React.FormEvent) => {
+  const handleTopUp = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (userId && amount) {
       const generatedIdempotencyKey =
@@ -99,7 +107,7 @@ export default function WalletDashboard() {
     }
   };
 
-  const handleCharge = (e: React.FormEvent) => {
+  const handleCharge = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (userId && amount) {
       const generatedIdempotencyKey =
@@ -112,7 +120,7 @@ export default function WalletDashboard() {
     }
   };
 
-  const handleGetUserByEmail = (e: React.FormEvent) => {
+  const handleGetUserByEmail = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (searchEmail) {
       setShouldSearchUser(true);
@@ -189,7 +197,7 @@ export default function WalletDashboard() {
             {/* Get User ID by Email */}
             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-6 rounded-xl shadow-xl">
               <h2 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">
+                <span className="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">
                   2
                 </span>
                 Find User by Email
@@ -397,7 +405,7 @@ export default function WalletDashboard() {
                   </span>
                 </h3>
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                  {transactions.map((tx) => (
+                  {transactions.map((tx: TransactionHistoryItem) => (
                     <div
                       key={tx.id}
                       className="bg-slate-900/30 border border-slate-600 p-4 rounded-lg hover:bg-slate-900/50 transition-all"
