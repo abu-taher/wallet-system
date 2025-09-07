@@ -7,6 +7,8 @@ import {
   formatCurrency, 
   validateAmount, 
   generateId,
+  convertToUser,
+  convertToTransaction,
   MIN_AMOUNT,
   MAX_AMOUNT 
 } from './database';
@@ -24,12 +26,6 @@ import type {
   GetUserRequest,
   GetUserTransactionsRequest
 } from './types';
-
-/**
- * tRPC Router for Wallet System API
- * Implements three core endpoints: createAccount, topUp, charge
- * Features: type safety, currency precision, duplicate prevention
- */
 
 export const createTRPCContext = async (_opts: TRPCContext) => {
   return {};
@@ -63,8 +59,8 @@ export const appRouter = router({
       
       try {
         // Check if user already exists
-        const existingUser = statements.getUserByEmail.get(input.email) as User | undefined;
-        if (existingUser) {
+        const existingUserResult = await statements.getUserByEmail(input.email);
+        if (existingUserResult.rows.length > 0) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'User with this email already exists',
@@ -72,9 +68,10 @@ export const appRouter = router({
         }
         
         // Create new user
-        statements.createUser.run(userId, input.email, input.name);
+        await statements.createUser(userId, input.email, input.name);
         
-        const newUser = statements.getUserById.get(userId) as User;
+        const newUserResult = await statements.getUserById(userId);
+        const newUser = convertToUser(newUserResult.rows[0]);
         return {
           id: newUser.id,
           email: newUser.email,
@@ -82,7 +79,8 @@ export const appRouter = router({
           balance: formatCurrency(newUser.balance),
         } satisfies UserResponse;
       } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        if (error && typeof error === 'object' && 'message' in error && 
+            typeof error.message === 'string' && error.message.includes('UNIQUE constraint failed')) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'User with this email already exists',
@@ -92,7 +90,6 @@ export const appRouter = router({
       }
     }),
 
-  // Top-Up Endpoint (Add balance)
   // Top-Up Endpoint (Add balance)
   topUp: publicProcedure
     .input(z.object({
@@ -130,10 +127,12 @@ export const appRouter = router({
       const formattedAmount = formatCurrency(amount);
       
       // Check for duplicate transaction
-      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction | undefined;
-      if (existingTransaction) {
+      const existingTransactionResult = await statements.getTransactionByIdempotencyKey(idempotencyKey);
+      if (existingTransactionResult.rows.length > 0) {
+        const existingTransaction = convertToTransaction(existingTransactionResult.rows[0]);
         // Return the existing transaction result
-        const user = statements.getUserById.get(userId) as User;
+        const userResult = await statements.getUserById(userId);
+        const user = convertToUser(userResult.rows[0]);
         return {
           success: true,
           transactionId: existingTransaction.id,
@@ -144,13 +143,14 @@ export const appRouter = router({
       }
       
       // Get user
-      const user = statements.getUserById.get(userId) as User | undefined;
-      if (!user) {
+      const userResult = await statements.getUserById(userId);
+      if (userResult.rows.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'User not found',
         });
       }
+      const user = convertToUser(userResult.rows[0]);
       
       // Calculate new balance
       const currentBalance = formatCurrency(user.balance);
@@ -160,19 +160,19 @@ export const appRouter = router({
       const transactionId = generateId();
       
       try {
-        const transaction = db.transaction(() => {
-          statements.updateBalance.run(newBalance, userId);
-          statements.createTransaction.run(
-            transactionId,
-            userId,
-            'topup',
-            formattedAmount,
-            newBalance,
-            idempotencyKey
-          );
-        });
-        
-        transaction();
+        // Use batch for transaction
+        await db.batch([
+          { sql: 'BEGIN', args: [] },
+          { 
+            sql: 'UPDATE users SET balance = ? WHERE id = ?', 
+            args: [newBalance, userId] 
+          },
+          {
+            sql: 'INSERT INTO transactions (id, user_id, type, amount, balance_after, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
+            args: [transactionId, userId, 'topup', formattedAmount, newBalance, idempotencyKey]
+          },
+          { sql: 'COMMIT', args: [] }
+        ]);
         
         return {
           success: true,
@@ -182,10 +182,18 @@ export const appRouter = router({
           duplicate: false,
         } satisfies TransactionResponse;
       } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        // Rollback on error
+        try {
+          await db.execute({ sql: 'ROLLBACK', args: [] });
+        } catch {}
+        
+        if (error && typeof error === 'object' && 'message' in error && 
+            typeof error.message === 'string' && error.message.includes('UNIQUE constraint failed')) {
           // Race condition: another request with same idempotency key succeeded
-          const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction;
-          const updatedUser = statements.getUserById.get(userId) as User;
+          const existingTransactionResult = await statements.getTransactionByIdempotencyKey(idempotencyKey);
+          const existingTransaction = convertToTransaction(existingTransactionResult.rows[0]);
+          const updatedUserResult = await statements.getUserById(userId);
+          const updatedUser = convertToUser(updatedUserResult.rows[0]);
           return {
             success: true,
             transactionId: existingTransaction.id,
@@ -235,10 +243,12 @@ export const appRouter = router({
       const formattedAmount = formatCurrency(amount);
       
       // Check for duplicate transaction
-      const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction | undefined;
-      if (existingTransaction) {
+      const existingTransactionResult = await statements.getTransactionByIdempotencyKey(idempotencyKey);
+      if (existingTransactionResult.rows.length > 0) {
+        const existingTransaction = convertToTransaction(existingTransactionResult.rows[0]);
         // Return the existing transaction result
-        const user = statements.getUserById.get(userId) as User;
+        const userResult = await statements.getUserById(userId);
+        const user = convertToUser(userResult.rows[0]);
         return {
           success: true,
           transactionId: existingTransaction.id,
@@ -249,13 +259,14 @@ export const appRouter = router({
       }
       
       // Get user
-      const user = statements.getUserById.get(userId) as User | undefined;
-      if (!user) {
+      const userResult = await statements.getUserById(userId);
+      if (userResult.rows.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'User not found',
         });
       }
+      const user = convertToUser(userResult.rows[0]);
       
       // Check sufficient balance
       const currentBalance = formatCurrency(user.balance);
@@ -281,19 +292,19 @@ export const appRouter = router({
       const transactionId = generateId();
       
       try {
-        const transaction = db.transaction(() => {
-          statements.updateBalance.run(newBalance, userId);
-          statements.createTransaction.run(
-            transactionId,
-            userId,
-            'charge',
-            formattedAmount,
-            newBalance,
-            idempotencyKey
-          );
-        });
-        
-        transaction();
+        // Use batch for transaction
+        await db.batch([
+          { sql: 'BEGIN', args: [] },
+          { 
+            sql: 'UPDATE users SET balance = ? WHERE id = ?', 
+            args: [newBalance, userId] 
+          },
+          {
+            sql: 'INSERT INTO transactions (id, user_id, type, amount, balance_after, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
+            args: [transactionId, userId, 'charge', formattedAmount, newBalance, idempotencyKey]
+          },
+          { sql: 'COMMIT', args: [] }
+        ]);
         
         return {
           success: true,
@@ -303,10 +314,18 @@ export const appRouter = router({
           duplicate: false,
         } satisfies TransactionResponse;
       } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        // Rollback on error
+        try {
+          await db.execute({ sql: 'ROLLBACK', args: [] });
+        } catch {}
+        
+        if (error && typeof error === 'object' && 'message' in error && 
+            typeof error.message === 'string' && error.message.includes('UNIQUE constraint failed')) {
           // Race condition: another request with same idempotency key succeeded
-          const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction;
-          const updatedUser = statements.getUserById.get(userId) as User;
+          const existingTransactionResult = await statements.getTransactionByIdempotencyKey(idempotencyKey);
+          const existingTransaction = convertToTransaction(existingTransactionResult.rows[0]);
+          const updatedUserResult = await statements.getUserById(userId);
+          const updatedUser = convertToUser(updatedUserResult.rows[0]);
           return {
             success: true,
             transactionId: existingTransaction.id,
@@ -330,13 +349,14 @@ export const appRouter = router({
         .toLowerCase()
     }))
     .query(async ({ input }: { input: GetUserByEmailRequest }) => {
-      const user = statements.getUserByEmail.get(input.email) as User | undefined;
-      if (!user) {
+      const userResult = await statements.getUserByEmail(input.email);
+      if (userResult.rows.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'No user found with this email address',
         });
       }
+      const user = convertToUser(userResult.rows[0]);
       return {
         id: user.id,
         email: user.email,
@@ -354,13 +374,14 @@ export const appRouter = router({
         .refine(val => val.length > 0, 'User ID cannot be empty')
     }))
     .query(async ({ input }: { input: GetUserRequest }) => {
-      const user = statements.getUserById.get(input.userId) as User | undefined;
-      if (!user) {
+      const userResult = await statements.getUserById(input.userId);
+      if (userResult.rows.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'User not found',
         });
       }
+      const user = convertToUser(userResult.rows[0]);
       return {
         id: user.id,
         email: user.email,
@@ -378,15 +399,16 @@ export const appRouter = router({
         .refine(val => val.length > 0, 'User ID cannot be empty')
     }))
     .query(async ({ input }: { input: GetUserTransactionsRequest }) => {
-      const user = statements.getUserById.get(input.userId) as User | undefined;
-      if (!user) {
+      const userResult = await statements.getUserById(input.userId);
+      if (userResult.rows.length === 0) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'User not found',
         });
       }
       
-      const transactions = statements.getUserTransactions.all(input.userId) as Transaction[];
+      const transactionsResult = await statements.getUserTransactions(input.userId);
+      const transactions = transactionsResult.rows.map(convertToTransaction);
       return transactions.map(tx => ({
         id: tx.id,
         type: tx.type,
