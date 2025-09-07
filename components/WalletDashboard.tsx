@@ -6,9 +6,6 @@ import type {
   UserResponse,
   TransactionResponse,
   TransactionHistoryItem,
-  WalletFormData,
-  FormState,
-  WalletError
 } from '../lib/types';
 
 export default function WalletDashboard() {
@@ -17,7 +14,9 @@ export default function WalletDashboard() {
   const [searchEmail, setSearchEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [amount, setAmount] = useState('');
-  const [result, setResult] = useState<{ error?: string } | UserResponse | TransactionResponse | null>(null);
+  const [result, setResult] = useState<
+    { error?: string } | UserResponse | TransactionResponse | null
+  >(null);
 
   const utils = trpc.useUtils();
 
@@ -56,11 +55,7 @@ export default function WalletDashboard() {
 
   const [shouldSearchUser, setShouldSearchUser] = useState(false);
 
-  const {
-    data: searchedUser,
-    error: searchError,
-    isFetching: isSearching,
-  } = trpc.getUserByEmail.useQuery(
+  const { isFetching: isSearching } = trpc.getUserByEmail.useQuery(
     { email: searchEmail },
     {
       enabled: shouldSearchUser && !!searchEmail,

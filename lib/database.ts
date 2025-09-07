@@ -1,8 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import type {
-  User,
-  Transaction,
   PreparedStatements,
   DatabaseConstants,
   CurrencyFormatter,
@@ -10,7 +8,7 @@ import type {
   IdGenerator,
   ValidationResult,
   DatabaseOperation,
-  TransactionOperation
+  TransactionOperation,
 } from './types';
 
 /**
@@ -23,14 +21,15 @@ const DATABASE_CONFIG: DatabaseConstants = {
   DATABASE_FILE: 'wallet.sqlite',
   CURRENCY_PRECISION: 100, // For 2 decimal places
   MAX_AMOUNT: 999999.99,
-  MIN_AMOUNT: 0.01
+  MIN_AMOUNT: 0.01,
 } as const;
 
-const { DATABASE_FILE, CURRENCY_PRECISION, MAX_AMOUNT, MIN_AMOUNT } = DATABASE_CONFIG;
+const { DATABASE_FILE, CURRENCY_PRECISION, MAX_AMOUNT, MIN_AMOUNT } =
+  DATABASE_CONFIG;
 
 // Initialize database connection
 // Use temporary directory for Vercel deployment compatibility
-const dbPath = process.env.VERCEL 
+const dbPath = process.env.VERCEL
   ? path.join('/tmp', DATABASE_FILE)
   : path.join(process.cwd(), DATABASE_FILE);
 
@@ -88,33 +87,32 @@ const statements: PreparedStatements = {
     INSERT INTO users (id, email, name, balance)
     VALUES (?, ?, ?, 0.00)
   `),
-  
+
   getUserById: db.prepare(`
     SELECT * FROM users WHERE id = ?
   `),
-  
+
   getUserByEmail: db.prepare(`
     SELECT * FROM users WHERE email = ?
   `),
-  
+
   updateBalance: db.prepare(`
     UPDATE users SET balance = ? WHERE id = ?
   `),
-  
+
   createTransaction: db.prepare(`
     INSERT INTO transactions (id, user_id, type, amount, balance_after, idempotency_key)
     VALUES (?, ?, ?, ?, ?, ?)
   `),
-  
+
   getTransactionByIdempotencyKey: db.prepare(`
     SELECT * FROM transactions WHERE idempotency_key = ?
   `),
-  
+
   getUserTransactions: db.prepare(`
     SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC
-  `)
+  `),
 };
-
 
 export { db, statements };
 
@@ -143,23 +141,23 @@ export const validateAmount: AmountValidator = (amount: number): boolean => {
   if (typeof amount !== 'number' || !Number.isFinite(amount) || isNaN(amount)) {
     return false;
   }
-  
+
   // Check for positive amount
   if (amount <= 0) {
     return false;
   }
-  
+
   // Check range
   if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
     return false;
   }
-  
+
   // Check decimal precision (max 2 decimal places)
   const decimalPlaces = (amount.toString().split('.')[1] || '').length;
   if (decimalPlaces > 2) {
     return false;
   }
-  
+
   return true;
 };
 
@@ -173,27 +171,30 @@ export const validateAmountDetailed = (amount: number): ValidationResult => {
   if (typeof amount !== 'number' || !Number.isFinite(amount) || isNaN(amount)) {
     return { isValid: false, error: 'Amount must be a valid number' };
   }
-  
+
   // Check for positive amount
   if (amount <= 0) {
     return { isValid: false, error: 'Amount must be positive' };
   }
-  
+
   // Check range
   if (amount < MIN_AMOUNT) {
     return { isValid: false, error: `Amount must be at least $${MIN_AMOUNT}` };
   }
-  
+
   if (amount > MAX_AMOUNT) {
     return { isValid: false, error: `Amount must be at most $${MAX_AMOUNT}` };
   }
-  
+
   // Check decimal precision (max 2 decimal places)
   const decimalPlaces = (amount.toString().split('.')[1] || '').length;
   if (decimalPlaces > 2) {
-    return { isValid: false, error: 'Amount can only have up to 2 decimal places' };
+    return {
+      isValid: false,
+      error: 'Amount can only have up to 2 decimal places',
+    };
   }
-  
+
   return { isValid: true };
 };
 
@@ -211,7 +212,9 @@ export const generateId: IdGenerator = (): string => {
  * @param operation - Database operation to execute
  * @returns Result of the operation
  */
-export const executeDatabaseOperation = <T>(operation: DatabaseOperation<T>): T => {
+export const executeDatabaseOperation = <T>(
+  operation: DatabaseOperation<T>
+): T => {
   try {
     return operation();
   } catch (error) {
@@ -224,7 +227,9 @@ export const executeDatabaseOperation = <T>(operation: DatabaseOperation<T>): T 
  * Executes a transaction operation within a database transaction
  * @param operation - Transaction operation to execute
  */
-export const executeTransactionOperation = (operation: TransactionOperation): void => {
+export const executeTransactionOperation = (
+  operation: TransactionOperation
+): void => {
   const transaction = db.transaction(operation);
   transaction();
 };
