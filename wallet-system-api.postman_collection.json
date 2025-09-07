@@ -1,0 +1,276 @@
+{
+	"info": {
+		"name": "Wallet System API",
+		"description": "Collection for testing the wallet system API endpoints with tRPC",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Create Account",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response has user data\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.result.data).to.have.property('id');",
+							"    pm.expect(jsonData.result.data).to.have.property('email');",
+							"    pm.expect(jsonData.result.data).to.have.property('name');",
+							"    pm.expect(jsonData.result.data).to.have.property('balance');",
+							"});",
+							"",
+							"// Save user ID for subsequent requests",
+							"var jsonData = pm.response.json();",
+							"if (jsonData.result && jsonData.result.data && jsonData.result.data.id) {",
+							"    pm.globals.set(\"userId\", jsonData.result.data.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"0\": {\n    \"json\": {\n      \"email\": \"john.doe@example.com\",\n      \"name\": \"John Doe\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/trpc/createAccount",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"trpc",
+						"createAccount"
+					]
+				},
+				"description": "Create a new user account with email and name"
+			},
+			"response": []
+		},
+		{
+			"name": "Top-Up Wallet",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Top-up successful\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.result.data).to.have.property('success', true);",
+							"    pm.expect(jsonData.result.data).to.have.property('transactionId');",
+							"    pm.expect(jsonData.result.data).to.have.property('newBalance');",
+							"    pm.expect(jsonData.result.data).to.have.property('amount');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"0\": {\n    \"json\": {\n      \"userId\": \"{{userId}}\",\n      \"amount\": 100.50,\n      \"idempotencyKey\": \"topup_{{$randomUUID}}\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/trpc/topUp",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"trpc",
+						"topUp"
+					]
+				},
+				"description": "Add balance to a user's wallet"
+			},
+			"response": []
+		},
+		{
+			"name": "Charge Wallet",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Charge successful\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.result.data).to.have.property('success', true);",
+							"    pm.expect(jsonData.result.data).to.have.property('transactionId');",
+							"    pm.expect(jsonData.result.data).to.have.property('newBalance');",
+							"    pm.expect(jsonData.result.data).to.have.property('amount');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"0\": {\n    \"json\": {\n      \"userId\": \"{{userId}}\",\n      \"amount\": 25.75,\n      \"idempotencyKey\": \"charge_{{$randomUUID}}\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/trpc/charge",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"trpc",
+						"charge"
+					]
+				},
+				"description": "Deduct balance from a user's wallet"
+			},
+			"response": []
+		},
+		{
+			"name": "Top-Up Duplicate Test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Duplicate handled correctly\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.result.data).to.have.property('duplicate', true);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"0\": {\n    \"json\": {\n      \"userId\": \"{{userId}}\",\n      \"amount\": 50.00,\n      \"idempotencyKey\": \"duplicate_test_key\"\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/trpc/topUp",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"trpc",
+						"topUp"
+					]
+				},
+				"description": "Test duplicate transaction handling - run this twice to see duplicate detection"
+			},
+			"response": []
+		},
+		{
+			"name": "Invalid Amount Test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 500 (tRPC error)\", function () {",
+							"    pm.response.to.have.status(500);",
+							"});",
+							"",
+							"pm.test(\"Error message present\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('error');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"0\": {\n    \"json\": {\n      \"userId\": \"{{userId}}\",\n      \"amount\": -10.00\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/trpc/topUp",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"trpc",
+						"topUp"
+					]
+				},
+				"description": "Test error handling with invalid negative amount"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
