@@ -31,7 +31,7 @@ import type {
  * Features: type safety, currency precision, duplicate prevention
  */
 
-export const createTRPCContext = async (opts: TRPCContext) => {
+export const createTRPCContext = async (_opts: TRPCContext) => {
   return {};
 };
 
@@ -81,8 +81,8 @@ export const appRouter = router({
           name: newUser.name,
           balance: formatCurrency(newUser.balance),
         } satisfies UserResponse;
-      } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'User with this email already exists',
@@ -181,8 +181,8 @@ export const appRouter = router({
           amount: formattedAmount,
           duplicate: false,
         } satisfies TransactionResponse;
-      } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           // Race condition: another request with same idempotency key succeeded
           const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction;
           const updatedUser = statements.getUserById.get(userId) as User;
@@ -302,8 +302,8 @@ export const appRouter = router({
           amount: formattedAmount,
           duplicate: false,
         } satisfies TransactionResponse;
-      } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
           // Race condition: another request with same idempotency key succeeded
           const existingTransaction = statements.getTransactionByIdempotencyKey.get(idempotencyKey) as Transaction;
           const updatedUser = statements.getUserById.get(userId) as User;

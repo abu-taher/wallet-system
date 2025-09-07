@@ -92,7 +92,7 @@ export interface WalletFormData {
 export interface FormState {
   isLoading: boolean;
   error: string | null;
-  result: any;
+  result: UserResponse | TransactionResponse | TransactionHistoryItem[] | null;
 }
 
 // Database Constants Types
@@ -122,19 +122,19 @@ export interface ValidationResult {
 
 // tRPC Context Type
 export interface TRPCContext {
-  req?: any;
-  res?: any;
+  req?: Request;
+  res?: Response;
 }
 
 // Database Statement Types
 export interface PreparedStatements {
-  createUser: any;
-  getUserById: any;
-  getUserByEmail: any;
-  updateBalance: any;
-  createTransaction: any;
-  getTransactionByIdempotencyKey: any;
-  getUserTransactions: any;
+  createUser: { run(userId: string, email: string, name: string): void };
+  getUserById: { get(userId: string): User | undefined };
+  getUserByEmail: { get(email: string): User | undefined };
+  updateBalance: { run(balance: number, userId: string): void };
+  createTransaction: { run(id: string, userId: string, type: string, amount: number, balanceAfter: number, idempotencyKey: string): void };
+  getTransactionByIdempotencyKey: { get(key: string): Transaction | undefined };
+  getUserTransactions: { all(userId: string): Transaction[] };
 }
 
 // Currency Utility Types
